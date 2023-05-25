@@ -1,7 +1,109 @@
 #!/usr/bin/env bash
-set -e
+# set -eE
 
-echo "Hello gh-bpush!"
+#!/bin/bash
+
+# Initialize variables
+will_create_pr=""
+base_branch=""
+will_add_labels=""
+labels=()
+
+# Function to display script usage
+function display_usage {
+  echo "Usage: $0 [--pr branch] [--label label1 label2 ...]"
+  echo ""
+  echo "Options:"
+  echo "  --pr branch        Specify the target branch for the pull request (required if --pr is used)"
+  echo "  --label label1 label2 ..."
+  echo "                     Specify labels to be added to the pull request (optional, depends on --pr)"
+  echo ""
+  exit 1
+}
+
+function check_pull_url {
+  local string="$1"
+  local pattern="https://github.com/.*/.*/pull/[0-9]+"
+  local isPullUrl=""
+
+  if [[ $string =~ $pattern ]]; then
+    isPullUrl="true"
+  else
+    isPullUrl="false"
+  fi
+
+  echo $isPullUrl
+}
+
+# Parse the command-line options
+while [[ $# -gt 0 ]]; do
+  key="$1"
+  case $key in
+    --pr)
+      will_create_pr="1"
+      base_branch="$2"
+      shift
+      shift
+      ;;
+    --label)
+      will_add_labels=1
+      shift
+      while [[ $# -gt 0 ]] && [[ "$1" != "--"* ]]; do
+        labels+=("$1")
+        shift
+      done
+      ;;
+    *)
+      display_usage
+      ;;
+  esac
+done
+
+
+# Check if required options are provided
+if [[ -n "$will_create_pr" ]] && [[ -z "$base_branch" ]]; then
+  echo "Error: base branch name is require when --pr is used."
+  display_usage
+fi
+
+if [[ -n "$will_add_labels" ]] && [[ ${#labels[@]} -eq 0 ]]; then
+  echo "Error: if --label is used, at least 1 label is required."
+  display_usage
+fi
+
+# Output the options
+# Get the current branch name
+current_branch=$(git rev-parse --abbrev-ref HEAD)
+
+# Push the current branch to the remote repository
+git push origin $current_branch
+
+
+# Create a pull request from the new branch to the specified branch
+# Replace "your_specified_branch" with the actual branch name you want to create a pull request to
+# Replace "Your Pull Request Title" and "Your Pull Request Body" with your desired title and body
+if [[ -n "$will_create_pr" ]]; then
+	create_pr_cmd="gh pr create --fill --base $base_branch --head $current_branch"
+	if [[ -n "$will_add_labels" ]]; then
+		for label in "${labels[@]}"; do
+		  create_pr_cmd+=" --label $label"
+		done
+	fi
+fi
+
+
+pr_output=$(eval "$create_pr_cmd")
+isPullUrl=$( check_pull_url $pr_output)
+
+if [[ "$isPullUrl" = "true" ]]; then
+	echo "PR created: $pr_output"
+fi
+
+# echo "Current Branch: $current_branch"
+# echo "Will Create PR: $will_create_pr"
+# echo "PR Branch: $pr_branch"
+# echo "Will Add Labels: $will_add_labels"
+# echo "Labels: ${labels[@]}"
 
 # Snippets to help get started:
 
