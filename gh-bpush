@@ -21,18 +21,41 @@ function display_usage {
   exit 1
 }
 
-function check_pull_url {
-  local string="$1"
-  local pattern="https://github.com/.*/.*/pull/[0-9]+"
-  local isPullUrl=""
+# function is_pull_url {
+#   local string="$1"
+#   local pattern="https://github.com/.*/.*/pull/[0-9]+"
+#   local isPullUrl=""
+
+#   if [[ $string =~ $pattern ]]; then
+#     isPullUrl="true"
+#   else
+#     isPullUrl="false"
+#   fi
+
+#   echo $isPullUrl
+# }
+
+function is_add_label_error {
+	local string="$1"
+
+  local pattern="could not add label.*"
+  local isError=""
 
   if [[ $string =~ $pattern ]]; then
-    isPullUrl="true"
+    isError="true"
   else
-    isPullUrl="false"
+    isError="false"
   fi
 
-  echo $isPullUrl
+  echo $isError
+}
+
+function create_label {
+	local label="$1"
+	local cmd="gh label create $label"
+
+	output=$(eval "$cmd")
+	echo $output
 }
 
 # Parse the command-line options
@@ -83,21 +106,42 @@ git push origin $current_branch
 # Replace "your_specified_branch" with the actual branch name you want to create a pull request to
 # Replace "Your Pull Request Title" and "Your Pull Request Body" with your desired title and body
 if [[ -n "$will_create_pr" ]]; then
-	create_pr_cmd="gh pr create --fill --base $base_branch --head $current_branch"
+	create_pr_cmd="gh pr create --fill --base $base_branch --head $current_branch --label $base_branch"
 	if [[ -n "$will_add_labels" ]]; then
 		for label in "${labels[@]}"; do
 		  create_pr_cmd+=" --label $label"
 		done
 	fi
-fi
 
 
-pr_output=$(eval "$create_pr_cmd")
-isPullUrl=$( check_pull_url $pr_output)
+	if ! pr_output=$(eval "$create_pr_cmd" 2>&1); then
+	  isAddLabelError=$(is_add_label_error "$pr_output")
+		if [[ "$isAddLabelError" = "true" ]]; then
+			echo "Some labels do not exist. Try to create all of them. Please ignore errors if there is any label that already created"
+			create_label $base_branch
+			for label in "${labels[@]}"; do
+			  create_label $label
+			done
+			if ! pr_output=$(eval "$create_pr_cmd" 2>&1); then
+				echo "PR creating error: $pr_output"
+	  		exit 1
+			fi
+		else
+			echo "PR creating error: $pr_output"
+	  	exit 1
+	  fi
+	fi
 
-if [[ "$isPullUrl" = "true" ]]; then
 	echo "PR created: $pr_output"
+
 fi
+
+# isPullUrl=$(is_pull_url $pr_output)
+
+# if [[ "$isPullUrl" = "true" ]]; then
+	
+# 	echo "PR created: $pr_output"
+# fi
 
 # echo "Current Branch: $current_branch"
 # echo "Will Create PR: $will_create_pr"
