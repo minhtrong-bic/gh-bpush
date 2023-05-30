@@ -8,6 +8,7 @@ will_create_pr=""
 base_branch=""
 will_add_labels=""
 labels=()
+pr_description=""
 
 # Function to display script usage
 function display_usage {
@@ -17,6 +18,8 @@ function display_usage {
   echo "  --pr branch        Specify the target branch for the pull request (required if --pr is used)"
   echo "  --label label1 label2 ..."
   echo "                     Specify labels to be added to the pull request (optional, depends on --pr)"
+  echo ""
+  echo "  --d description    Provide the description for the pull request. Text is put in a pair of double quotes"
   echo ""
   exit 1
 }
@@ -76,6 +79,11 @@ while [[ $# -gt 0 ]]; do
         shift
       done
       ;;
+    --d)
+      pr_description="$2"
+      shift
+      shift
+      ;;
     *)
       display_usage
       ;;
@@ -112,6 +120,12 @@ if [[ -n "$will_create_pr" ]]; then
 		  create_pr_cmd+=" --label $label"
 		done
 	fi
+
+
+  if [[ ! -z "$pr_description" ]]; then
+    create_pr_cmd+=" --body \"$pr_description\""
+  fi
+
 
 
 	if ! pr_output=$(eval "$create_pr_cmd" 2>&1); then
